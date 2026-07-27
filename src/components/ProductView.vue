@@ -2,7 +2,7 @@
   <div v-if="meta?.status === 'loading'">Loading...</div>
   <div v-else-if="meta?.status === 'error'">Error: {{ meta.error }}</div>
   <ul v-else>
-    <li v-for="p in items" :key="p.id">{{ p.title }} - ${{ p.price }}</li>
+    <li v-for="p in items" :key="p.id">{{ p.title }} - ${{ p.price }} - {{ p.category }}</li>
   </ul>
 
   <button
@@ -16,13 +16,17 @@
 </template>
 
 <script setup lang="ts">
-import { buildListKey } from '@/helpers/keyBuilder'
+const props = defineProps<{
+  category: 'shirts' | 'hats' | 'shoes'
+  search?: string
+}>()
+
+import { buildListKey } from '@/helpers/helper'
 import { useProductStore } from '@/stores/product'
 import { computed, onMounted, ref } from 'vue'
 
 const store = useProductStore()
-const category = 'shoes'
-const listKey = buildListKey({ category })
+const listKey = buildListKey({ category: props.category, search: props.search })
 
 const currentPage = ref(1)
 
@@ -31,7 +35,7 @@ const meta = computed(() => store.listMeta(listKey))
 
 function goToPage(page: number) {
   currentPage.value = page
-  store.fetchPage({ category, page })
+  store.fetchPage({ category: props.category, page, search: props.search })
 }
 
 onMounted(() => goToPage(1))

@@ -11,6 +11,8 @@ const ALL_PRODUCTS: Product[] = Array.from({ length: 47 }, (_, i) => ({
 export function mockFetchProducts(params: FetchParams): Promise<ApiPageResponse> {
   const pageSize = params.pageSize ?? 10
 
+  console.log('params: ', params)
+
   let filtered = ALL_PRODUCTS
 
   if (params.category) {

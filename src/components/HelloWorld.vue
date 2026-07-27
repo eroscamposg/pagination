@@ -1,19 +1,41 @@
-<script setup lang="ts">
-defineProps<{
-  msg: string
-}>()
-</script>
-
 <template>
-  <div class="greetings">
-    <h1 class="green">{{ msg }}</h1>
-    <h3>
-      You’ve successfully created a project with
-      <a href="https://vite.dev/" target="_blank" rel="noopener">Vite</a> +
-      <a href="https://vuejs.org/" target="_blank" rel="noopener">Vue 3</a>. What's next?
-    </h3>
-  </div>
+  <div v-if="meta?.status === 'loading'">Loading...</div>
+  <div v-else-if="meta?.status === 'error'">Error: {{ meta.error }}</div>
+  <ul v-else>
+    <li v-for="p in items" :key="p.id">{{ p.title }} - ${{ p.price }}</li>
+  </ul>
+
+  <button
+    v-for="p in meta?.totalPages"
+    :key="p"
+    :class="{ active: p === meta?.currentPage }"
+    @click="goToPage(p)"
+  >
+    {{ p }}
+  </button>
 </template>
+
+<script setup lang="ts">
+import { buildListKey } from '@/helpers/keyBuilder'
+import { useProductStore } from '@/stores/product'
+import { computed, onMounted, ref } from 'vue'
+
+const store = useProductStore()
+const category = 'shoes'
+const listKey = buildListKey({ category })
+
+const currentPage = ref(1)
+
+const items = computed(() => store.currentPageItems(listKey))
+const meta = computed(() => store.listMeta(listKey))
+
+function goToPage(page: number) {
+  currentPage.value = page
+  store.fetchPage({ category, page })
+}
+
+onMounted(() => goToPage(1))
+</script>
 
 <style scoped>
 h1 {

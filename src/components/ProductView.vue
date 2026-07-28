@@ -2,7 +2,12 @@
   <div v-if="meta?.status === 'loading'">Loading...</div>
   <div v-else-if="meta?.status === 'error'">Error: {{ meta.error }}</div>
   <ul v-else>
-    <li v-for="p in items" :key="p.id">{{ p.title }} - ${{ p.price }} - {{ p.category }}</li>
+    <li v-for="p in items" :key="p.id">
+      <div :style="{ display: 'flex' }">
+        <p :style="{ marginRight: '2rem' }">{{ p.title }} - ${{ p.price }} - {{ p.category }}</p>
+        <UpdateView :key="p.title" :product-id="p.id" />
+      </div>
+    </li>
   </ul>
 
   <button
@@ -24,6 +29,7 @@ const props = defineProps<{
 import { buildListKey } from '@/helpers/helper'
 import { useProductStore } from '@/stores/product'
 import { computed, onMounted, ref } from 'vue'
+import UpdateView from './UpdateView.vue'
 
 const store = useProductStore()
 const listKey = buildListKey({ category: props.category, search: props.search })

@@ -45,3 +45,28 @@ export function mockFetchProducts(params: FetchParams): Promise<ApiPageResponse>
     }, 400)
   })
 }
+
+// Mock PATCH endpoint — updates a single product. Rejects if the new price
+// is negative, so we have an easy way to demo the rollback path.
+export function mockUpdateProduct(
+  id: number,
+  patch: Partial<Pick<Product, 'title' | 'price'>>,
+): Promise<Product> {
+  return new Promise((resolve, reject) => {
+    setTimeout(() => {
+      const index = ALL_PRODUCTS.findIndex((p) => p.id === id)
+      const existing = ALL_PRODUCTS[index]
+
+      if (index === -1 || !existing) return reject(new Error(`Product ${id} not found`))
+
+      if (patch.price !== undefined && patch.price < 0) {
+        return reject(new Error('Price cannot be negative'))
+      }
+
+      // Added existing and type check with existing
+      ALL_PRODUCTS[index] = { ...existing, ...patch }
+
+      resolve(ALL_PRODUCTS[index])
+    }, 500) // deliberately slower than the read, so the optimistic gap is visible
+  })
+}

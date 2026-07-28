@@ -12,6 +12,10 @@ export interface ListState {
 export interface ProductsState {
   entities: Record<number, Product>
   lists: Record<string, ListState>
+  // IDs currently being saved via an optimistic update — lets the UI
+  // disable inputs / show a spinner without a separate loading state
+  // per field.
+  pendingIds: Record<number, boolean>
 }
 
 export interface RootState {

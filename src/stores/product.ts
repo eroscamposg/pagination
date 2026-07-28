@@ -2,12 +2,13 @@ import { defineStore } from 'pinia'
 import type { ListState, ProductsState } from '@/types/states'
 import type { Product } from '@/types/product'
 import { buildListKey, getListOrThrow } from '@/helpers/helper'
-import { mockFetchProducts } from '@/services/api'
+import { mockFetchProducts, mockUpdateProduct } from '@/services/api'
 
 export const useProductStore = defineStore('product', {
   state: (): ProductsState => ({
     entities: {},
     lists: {},
+    pendingIds: {},
   }),
   getters: {
     // Resolves IDs -> full objects for whatever page a list is currently on.
@@ -31,6 +32,11 @@ export const useProductStore = defineStore('product', {
       (state) =>
       (listKey: string, page: number): boolean => {
         return Boolean(state.lists[listKey]?.idsByPage[page])
+      },
+    isEntityPending:
+      (state) =>
+      (id: number): boolean => {
+        return Boolean(state.pendingIds[id])
       },
   },
   actions: {
@@ -84,6 +90,30 @@ export const useProductStore = defineStore('product', {
       list.totalItems = totalItems
     },
 
+    // Partial, optimistic write — used for the immediate local update
+    // before the server has confirmed anything.
+    PATCH_ENTITY({ id, patch }: { id: number; patch: Partial<Product> }) {
+      const existing = this.entities[id]
+      if (!existing) return
+      this.entities[id] = { ...existing, ...patch }
+    },
+
+    // Full replace — used both to reconcile with the server's confirmed
+    // response and to roll back to a pre-optimistic snapshot on failure.
+    // Same mutation serves both purposes because both are "this is now
+    // the source of truth for this entity."
+    REPLACE_ENTITY({ id, entity }: { id: number; entity: Product }) {
+      this.entities[id] = entity
+    },
+
+    SET_ENTITY_PENDING({ id, pending }: { id: number; pending: boolean }) {
+      if (pending) {
+        this.pendingIds[id] = true
+      } else {
+        delete this.pendingIds[id]
+      }
+    },
+
     // ACTIONS
     async fetchPage(payload: {
       category?: string
@@ -120,6 +150,44 @@ export const useProductStore = defineStore('product', {
         this.SET_LIST_STATUS(listKey, 'success')
       } catch (err) {
         this.SET_LIST_STATUS(listKey, 'error', err instanceof Error ? err.message : 'Unknown error')
+      }
+    },
+    async updateProductOptimistic({
+      id,
+      patch,
+    }: {
+      id: number
+      patch: Partial<Pick<Product, 'title' | 'price'>>
+    }) {
+      const previous = this.entities[id]
+      if (!previous) {
+        throw new Error(`Cannot update product ${id} — not present in store`)
+      }
+
+      console.log('previous: ', previous)
+
+      // Snapshot BEFORE mutating, so we have something exact to roll back to.
+      // (Spreading here, not reusing `previous` by reference, since `previous`
+      // will keep pointing at whatever is currently in state.entities[id]
+      // after the optimistic write below.)
+      const snapshot: Product = { ...previous }
+
+      this.SET_ENTITY_PENDING({ id, pending: true })
+      this.PATCH_ENTITY({ id, patch }) // <- UI reflects this instantly
+
+      try {
+        const confirmed = await mockUpdateProduct(id, patch)
+        // Reconcile with whatever the server actually persisted — covers
+        // cases where the server computes/normalizes fields we didn't send.
+        this.REPLACE_ENTITY({ id, entity: confirmed })
+      } catch (err) {
+        // Roll back to exactly what was there before the optimistic write.
+        this.REPLACE_ENTITY({ id, entity: snapshot })
+        // Re-throw so the component can show a toast/inline error — the
+        // store shouldn't decide how failure is presented.
+        throw err
+      } finally {
+        this.SET_ENTITY_PENDING({ id, pending: false })
       }
     },
   },
